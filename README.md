@@ -1,0 +1,2 @@
+# JSON to Flat File Example
+This repo contains an example of mapping a Flat File (using an FFD schema) from a JSON object. This example builds upon the one from MuleSoft's documentation: https://docs.mulesoft.com/dataweave/2.4/dataweave-flat-file-schemas

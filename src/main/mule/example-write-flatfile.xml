@@ -1,0 +1,74 @@
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+  <file:config name="File_Config" doc:name="File Config" >
+    <file:connection workingDir="${fileWorkingDir}" />
+  </file:config>
+  <configuration-properties doc:name="Configuration properties" file="flatfileconfig.properties" />
+  <flow name="WriteFlatFile" >
+    <scheduler doc:name="Scheduler" >
+    	<scheduling-strategy >
+        <fixed-frequency frequency="10000" />
+    	</scheduling-strategy>
+    </scheduler>
+    <file:read doc:name="Read JSON file" config-ref="File_Config" path="${jsonFileReadPath}"/>
+    <ee:transform doc:name="Transform to flat file" doc:id="ec1a3ed6-dbf9-4d14-884b-71662eccb63a"> 
+    	<ee:message>
+        <ee:set-payload><![CDATA[%dw 2.0
+output application/flatfile schemaPath = "flatfileschema.ffd"
+---
+{
+	RQH: {
+		"Record Type": payload.RQH."Record Type",
+		"File Creation Date": payload.RQH."File Creation Date" as Date {format: "yyyy-MM-dd"},
+		"File Creation Time": payload.RQH."File Creation Time" as Time,
+		"Unique File Identifier": payload.RQH."Unique File Identifier",
+		Currency: payload.RQH.Currency
+	},
+	Batch: payload.Batch map ( batch , indexOfBatch ) -> {
+		BCH: {
+			"Record Type": batch.BCH."Record Type",
+			"Sequence Number": batch.BCH."Sequence Number",
+			"Batch Function": batch.BCH."Batch Function",
+			"Company Name": batch.BCH."Company Name",
+			"Unique Batch Identifier": batch.BCH."Unique Batch Identifier"},
+		TDR: batch.TDR map (tdr, indexOfTdr) ->
+			{
+			"Record Type": tdr.TDR."Record Type",
+			"Sequence Number": tdr.TDR."Sequence Number",
+			"Batch Function": tdr.TDR."Batch Function",
+			"Account Number": tdr.TDR."Account Number",
+			"Amount": tdr.TDR.Amount,
+			"Type": tdr.TDR.'Type'
+			},
+		BCF: {
+			"Record Type": batch.BCF."Record Type",
+			"Sequence Number": batch.BCF."Sequence Number",
+			"Batch Function": batch.BCF."Batch Function",
+			"Batch Transaction Amount": batch.BCF."Batch Transaction Amount",
+			"Type": batch.BCF.'Type',
+			"Batch Transaction Count": batch.BCF."Batch Transaction Count",
+			"Unique Batch Identifier": batch.BCF."Unique Batch Identifier"}
+		},
+	RQF: {
+		"Record Type": payload.RQF."Record Type",
+		"File Batch Count": payload.RQF."File Batch Count",
+		"File Transaction Count": payload.RQF."File Transaction Count",
+		"File Transaction Amount": payload.RQF."File Transaction Amount",
+		Type: payload.RQF.Type,
+		"Unique File Identifier": payload.RQF."Unique File Identifier"
+	}
+}
+]]>
+      </ee:set-payload>
+    	</ee:message>
+    </ee:transform>
+    <logger level="INFO" doc:name="Logger" message='#["\n"]Writing flat file to: ${mule.home}/apps/${app.name}/${fileWritePath}#["\n"]#[payload]'/>
+    <file:write doc:name="Write flat file" config-ref="File_Config" path="${fileWritePath}" /> 
+	</flow>
+</mule>
